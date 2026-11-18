@@ -246,6 +246,15 @@ class NTFSFileEntryTest(shared_test_lib.BaseTestCase):
 
         self.assertEqual(data_stream_names, [""])
 
+        data_stream = file_entry.GetDataStream("")
+        self.assertIsNotNone(data_stream)
+        self.assertEqual(data_stream.name, "")
+        self.assertEqual(data_stream.size, file_entry.size)
+        self.assertTrue(data_stream.IsDefault())
+
+        file_object = file_entry.GetFileObject(data_stream_name="bogus")
+        self.assertIsNone(file_object)
+
         path_spec = path_spec_factory.Factory.NewPathSpec(
             definitions.TYPE_INDICATOR_NTFS,
             location="\\a_directory",
@@ -280,6 +289,19 @@ class NTFSFileEntryTest(shared_test_lib.BaseTestCase):
 
         expected_data_stream_names = sorted(["", "$Info"])
         self.assertEqual(sorted(data_stream_names), expected_data_stream_names)
+
+        default_data_stream = file_entry.GetDataStream("")
+        self.assertIsNotNone(default_data_stream)
+        self.assertEqual(default_data_stream.size, file_entry.size)
+        self.assertEqual(default_data_stream.size, 131072)
+
+        alternate_data_stream = file_entry.GetDataStream("$Info")
+        self.assertIsNotNone(alternate_data_stream)
+        self.assertEqual(alternate_data_stream.name, "$Info")
+        self.assertFalse(alternate_data_stream.IsDefault())
+        alternate_file_object = file_entry.GetFileObject(data_stream_name="$Info")
+        self.assertIsNotNone(alternate_file_object)
+        self.assertEqual(alternate_data_stream.size, alternate_file_object.get_size())
 
     def testModificationTime(self):
         """Test the modification_time property."""
@@ -430,6 +452,9 @@ class NTFSFileEntryTest(shared_test_lib.BaseTestCase):
         self.assertIsNotNone(file_object)
 
         self.assertEqual(file_object.get_size(), 32)
+
+        file_object = file_entry.GetFileObject(data_stream_name="bogus")
+        self.assertIsNone(file_object)
 
         path_spec = path_spec_factory.Factory.NewPathSpec(
             definitions.TYPE_INDICATOR_NTFS,

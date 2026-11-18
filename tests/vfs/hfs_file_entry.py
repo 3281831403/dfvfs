@@ -197,6 +197,7 @@ class HFSFileEntryTest(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 
@@ -233,6 +234,20 @@ class HFSFileEntryTest(shared_test_lib.BaseTestCase):
             data_stream_names.append(data_stream.name)
 
         self.assertEqual(data_stream_names, ["", "rsrc"])
+
+        default_data_stream = file_entry.GetDataStream("")
+        self.assertIsNotNone(default_data_stream)
+        self.assertEqual(default_data_stream.size, file_entry.size)
+        self.assertTrue(default_data_stream.IsDefault())
+
+        resource_data_stream = file_entry.GetDataStream("rsrc")
+        self.assertIsNotNone(resource_data_stream)
+        self.assertFalse(resource_data_stream.IsDefault())
+        resource_file_object = file_entry.GetFileObject(data_stream_name="rsrc")
+        self.assertIsNotNone(resource_file_object)
+        self.assertEqual(
+            resource_data_stream.size, resource_file_object.get_size()
+        )
 
     def testModificationTime(self):
         """Test the modification_time property."""

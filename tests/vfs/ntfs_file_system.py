@@ -116,6 +116,51 @@ class NTFSFileSystemTest(shared_test_lib.BaseTestCase):
 
     # TODO: add tests for GetNTFSFileEntryByPathSpec function.
 
+    def testGetDataStreamByPathSpec(self):
+        """Tests the GetDataStreamByPathSpec function."""
+        file_system = ntfs_file_system.NTFSFileSystem(
+            self._resolver_context, self._ntfs_path_spec
+        )
+        self.assertIsNotNone(file_system)
+
+        file_system.Open()
+
+        # A path specification without a data_stream attribute resolves to the
+        # default data stream.
+        path_spec = path_spec_factory.Factory.NewPathSpec(
+            definitions.TYPE_INDICATOR_NTFS,
+            location="\\passwords.txt",
+            mft_entry=self._MFT_ENTRY_PASSWORDS_TXT,
+            parent=self._raw_path_spec,
+        )
+        data_stream = file_system.GetDataStreamByPathSpec(path_spec)
+        self.assertIsNotNone(data_stream)
+        self.assertEqual(data_stream.name, "")
+        self.assertTrue(data_stream.IsDefault())
+
+        # An explicitly named data stream resolves to that data stream.
+        path_spec = path_spec_factory.Factory.NewPathSpec(
+            definitions.TYPE_INDICATOR_NTFS,
+            data_stream="$Info",
+            location="\\$UpCase",
+            mft_entry=10,
+            parent=self._raw_path_spec,
+        )
+        data_stream = file_system.GetDataStreamByPathSpec(path_spec)
+        self.assertIsNotNone(data_stream)
+        self.assertEqual(data_stream.name, "$Info")
+
+        # A non-existing data stream name results in None.
+        path_spec = path_spec_factory.Factory.NewPathSpec(
+            definitions.TYPE_INDICATOR_NTFS,
+            data_stream="bogus",
+            location="\\passwords.txt",
+            mft_entry=self._MFT_ENTRY_PASSWORDS_TXT,
+            parent=self._raw_path_spec,
+        )
+        data_stream = file_system.GetDataStreamByPathSpec(path_spec)
+        self.assertIsNone(data_stream)
+
     def testGetRootFileEntry(self):
         """Test the get root file entry functionality."""
         file_system = ntfs_file_system.NTFSFileSystem(

@@ -58,6 +58,20 @@ class TSKDataStreamTestExt2(shared_test_lib.BaseTestCase):
         test_data_stream = tsk_data_stream.TSKDataStream(file_entry, None)
         self.assertEqual(test_data_stream.name, "")
 
+    def testSize(self):
+        """Test the size property."""
+        path_spec = path_spec_factory.Factory.NewPathSpec(
+            definitions.TYPE_INDICATOR_EXT,
+            inode=self._INODE_ANOTHER_FILE,
+            location="/a_directory/another_file",
+            parent=self._raw_path_spec,
+        )
+        file_entry = self._file_system.GetFileEntryByPathSpec(path_spec)
+        self.assertIsNotNone(file_entry)
+
+        test_data_stream = tsk_data_stream.TSKDataStream(file_entry, None)
+        self.assertEqual(test_data_stream.size, file_entry.size)
+
     def testGetExtents(self):
         """Test the GetExtents function."""
         path_spec = path_spec_factory.Factory.NewPathSpec(
@@ -293,6 +307,33 @@ class TSKDataStreamTestNTFS(shared_test_lib.BaseTestCase):
 
         test_data_stream = tsk_data_stream.TSKDataStream(file_entry, tsk_attribute)
         self.assertEqual(test_data_stream.name, "$Info")
+
+    def testSize(self):
+        """Test the size property."""
+        path_spec = path_spec_factory.Factory.NewPathSpec(
+            definitions.TYPE_INDICATOR_TSK,
+            inode=10,
+            location="/$UpCase",
+            parent=self._raw_path_spec,
+        )
+        file_entry = self._file_system.GetFileEntryByPathSpec(path_spec)
+        self.assertIsNotNone(file_entry)
+
+        # The default data stream size equals the file entry data size.
+        test_data_stream = tsk_data_stream.TSKDataStream(file_entry, None)
+        self.assertEqual(test_data_stream.size, file_entry.size)
+        self.assertEqual(test_data_stream.size, 131072)
+
+        tsk_file = file_entry.GetTSKFile()
+        self.assertIsNotNone(tsk_file)
+
+        tsk_attribute = self._GetAlternateDataStreamAttribute(tsk_file)
+        self.assertIsNotNone(tsk_attribute)
+
+        # A named data stream uses the size of its TSK attribute.
+        test_data_stream = tsk_data_stream.TSKDataStream(file_entry, tsk_attribute)
+        self.assertEqual(test_data_stream.name, "$Info")
+        self.assertEqual(test_data_stream.size, tsk_attribute.info.size)
 
     def testGetExtents(self):
         """Test the GetExtents function."""

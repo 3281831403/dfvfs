@@ -62,6 +62,30 @@ class HFSDataStreamTest(shared_test_lib.BaseTestCase):
         test_data_stream = hfs_data_stream.HFSDataStream(file_entry, fshfs_data_stream)
         self.assertEqual(test_data_stream.name, "rsrc")
 
+    def testSize(self):
+        """Test the size property."""
+        path_spec = path_spec_factory.Factory.NewPathSpec(
+            definitions.TYPE_INDICATOR_HFS,
+            identifier=25,
+            location="/a_directory/a_resourcefork",
+            parent=self._raw_path_spec,
+        )
+        file_entry = self._file_system.GetFileEntryByPathSpec(path_spec)
+        self.assertIsNotNone(file_entry)
+
+        # The default data stream size equals the file entry data size.
+        test_data_stream = hfs_data_stream.HFSDataStream(file_entry, None)
+        self.assertEqual(test_data_stream.size, file_entry.size)
+
+        fshfs_file_entry = file_entry.GetHFSFileEntry()
+        self.assertIsNotNone(fshfs_file_entry)
+
+        fshfs_data_stream = fshfs_file_entry.get_resource_fork()
+
+        # The resource fork size is independent of the file entry data size.
+        test_data_stream = hfs_data_stream.HFSDataStream(file_entry, fshfs_data_stream)
+        self.assertEqual(test_data_stream.size, fshfs_data_stream.get_size())
+
     def testGetExtents(self):
         """Test the GetExtents function."""
         path_spec = path_spec_factory.Factory.NewPathSpec(

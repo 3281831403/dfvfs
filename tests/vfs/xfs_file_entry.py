@@ -348,6 +348,7 @@ class XFSFileEntryTest(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 
@@ -365,6 +366,7 @@ class XFSFileEntryTest(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [])
 
@@ -719,6 +721,7 @@ class XFSFileEntryTestWithBigtime(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 
@@ -736,6 +739,7 @@ class XFSFileEntryTestWithBigtime(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [])
 

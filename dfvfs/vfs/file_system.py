@@ -124,7 +124,7 @@ class FileSystem:
         if not file_entry:
             return None
 
-        data_stream_name = getattr(path_spec, "data_stream", None)
+        data_stream_name = getattr(path_spec, "data_stream", None) or ""
         return file_entry.GetDataStream(data_stream_name)
 
     @abc.abstractmethod

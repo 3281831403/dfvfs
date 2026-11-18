@@ -284,6 +284,9 @@ class NTFSFileEntry(file_entry.FileEntry):
         ):
             return None
 
+        if data_stream_name and not self.HasDataStream(data_stream_name):
+            return None
+
         # Make sure to make the changes on a copy of the path specification, so we
         # do not alter self.path_spec.
         path_spec = copy.deepcopy(self.path_spec)

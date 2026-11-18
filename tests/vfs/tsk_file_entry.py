@@ -448,6 +448,7 @@ class TSKFileEntryTestExt2(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 
@@ -870,6 +871,7 @@ class TSKFileEntryTestFAT12(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 
@@ -1371,6 +1373,7 @@ class TSKFileEntryTestHFSPlus(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 
@@ -1855,6 +1858,7 @@ class TSKFileEntryTestISO9660(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 
@@ -2132,6 +2136,7 @@ class TSKFileEntryTestNTFS(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 
@@ -2708,6 +2713,7 @@ class TSKFileEntryTestUfs1(shared_test_lib.BaseTestCase):
         data_stream_names = []
         for data_stream in file_entry.data_streams:
             data_stream_names.append(data_stream.name)
+            self.assertEqual(data_stream.size, file_entry.size)
 
         self.assertEqual(data_stream_names, [""])
 

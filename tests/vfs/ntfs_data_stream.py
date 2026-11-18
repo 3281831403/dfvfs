@@ -66,6 +66,35 @@ class NTFSDataStreamTest(shared_test_lib.BaseTestCase):
         )
         self.assertEqual(test_data_stream.name, "$Info")
 
+    def testSize(self):
+        """Test the size property."""
+        path_spec = path_spec_factory.Factory.NewPathSpec(
+            definitions.TYPE_INDICATOR_NTFS,
+            location="\\$UpCase",
+            mft_entry=10,
+            parent=self._raw_path_spec,
+        )
+        file_entry = self._file_system.GetFileEntryByPathSpec(path_spec)
+        self.assertIsNotNone(file_entry)
+
+        # The default data stream size equals the file entry data size.
+        test_data_stream = ntfs_data_stream.NTFSDataStream(file_entry, None)
+        self.assertEqual(test_data_stream.size, file_entry.size)
+        self.assertEqual(test_data_stream.size, 131072)
+
+        fsntfs_file_entry = file_entry.GetNTFSFileEntry()
+        self.assertIsNotNone(fsntfs_file_entry)
+
+        fsntfs_data_stream = fsntfs_file_entry.get_alternate_data_stream_by_name(
+            "$Info"
+        )
+
+        test_data_stream = ntfs_data_stream.NTFSDataStream(
+            file_entry, fsntfs_data_stream
+        )
+        self.assertEqual(test_data_stream.size, fsntfs_data_stream.get_size())
+        self.assertEqual(test_data_stream.size, 32)
+
     def testGetExtents(self):
         """Test the GetExtents function."""
         path_spec = path_spec_factory.Factory.NewPathSpec(

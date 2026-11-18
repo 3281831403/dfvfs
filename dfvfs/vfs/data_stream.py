@@ -23,6 +23,11 @@ class DataStream:
     @property
     def size(self):
         """int: size."""
+        # The default data stream contains the data of the file entry, its
+        # size therefore equals the size of the file entry. Named data streams
+        # store their own size in self._size.
+        if not self._name and self._file_entry:
+            return self._file_entry.size
         return self._size
 
     def GetExtents(self):
