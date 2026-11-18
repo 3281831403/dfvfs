@@ -13,6 +13,8 @@ class _PathSpecJsonDecoder(json.JSONDecoder):
 
     _CLASS_TYPES = frozenset(["PathSpec"])
 
+    _BYTES_CLASS_TYPE = "bytes"
+
     def __init__(self, *args, **kargs):
         """Initializes a path specification JSON decoder."""
         super().__init__(*args, object_hook=self._ConvertDictToObject, **kargs)
@@ -42,10 +44,16 @@ class _PathSpecJsonDecoder(json.JSONDecoder):
 
         Raises:
           TypeError: if the JSON serialized object does not contain a '__type__'
-              attribute that contains 'PathSpec'.
+              attribute that contains 'PathSpec' or 'bytes'.
         """
         # Use __type__ to indicate the object class type.
         class_type = json_dict.get("__type__")
+
+        # Convert a JSON serialized bytes object back into bytes. Note that
+        # the object hook is called bottom-up, so bytes values are restored
+        # before the path specification object that contains them.
+        if class_type == self._BYTES_CLASS_TYPE:
+            return bytes.fromhex(json_dict["hex"])
 
         if class_type not in self._CLASS_TYPES:
             raise TypeError("Missing path specification object type.")
@@ -93,11 +101,13 @@ class _PathSpecJsonEncoder(json.JSONEncoder):
 
         Here '__type__' indicates the object base type in this case this should
         be 'PathSpec'. The rest of the elements of the dictionary make up the
-        path specification object properties. The supported property names are
-        defined in path_spec_factory.Factory.PROPERTY_NAMES. Note that this method
-        is called recursively for every path specification object and creates
-        a dict of dicts in the process that is transformed into a JSON string
-        by the JSON encoder.
+        path specification object properties. The properties are copied from
+        the path specification object attributes, so that every attribute that
+        defines the identity of the path specification (its comparable
+        representation) is preserved. Note that this method is called
+        recursively for every path specification object and creates a dict of
+        dicts in the process that is transformed into a JSON string by the
+        JSON encoder.
 
         Args:
           path_spec_object (PathSpec): a path specification.
@@ -112,22 +122,26 @@ class _PathSpecJsonEncoder(json.JSONEncoder):
             raise TypeError
 
         json_dict = {"__type__": "PathSpec"}
-        for property_name in path_spec_factory.Factory.PROPERTY_NAMES:
-            property_value = getattr(path_spec_object, property_name, None)
-            if property_value is not None:
-                # Convert row_condition tuple to a list
-                if property_name == "row_condition":
-                    json_dict[property_name] = list(property_value)
-                else:
-                    json_dict[property_name] = property_value
+        for property_name, property_value in path_spec_object.__dict__.items():
+            if property_value is None:
+                continue
 
-        if path_spec_object.HasParent():
-            json_dict["parent"] = self.default(path_spec_object.parent)
+            if property_name == "parent":
+                property_value = self.default(property_value)
+            elif isinstance(property_value, bytes):
+                # JSON does not support bytes so they are stored as a
+                # hexadecimal string with a type indicator.
+                property_value = {
+                    "__type__": "bytes",
+                    "hex": property_value.hex(),
+                }
+            elif isinstance(property_value, tuple):
+                # Convert tuples such as row_condition to a list.
+                property_value = list(property_value)
+
+            json_dict[property_name] = property_value
 
         json_dict["type_indicator"] = path_spec_object.type_indicator
-        location = getattr(path_spec_object, "location", None)
-        if location:
-            json_dict["location"] = location
 
         return json_dict
 
