@@ -36,6 +36,11 @@ class VolumeScannerOptions:
     # Only scan volumes for available file systems. Do not scan snapshots.
     SCAN_MODE_VOLUMES_ONLY = "volumes-only"
 
+    # Supported scan modes.
+    SCAN_MODES = frozenset(
+        [SCAN_MODE_ALL, SCAN_MODE_SNAPSHOTS_ONLY, SCAN_MODE_VOLUMES_ONLY]
+    )
+
     def __init__(self):
         """Initializes volume scanner options."""
         super().__init__()
@@ -133,6 +138,17 @@ class VolumeScannerMediator:
 
         return None
 
+    def PrintWarning(self, warning):
+        """Prints a warning.
+
+        This method can be used to inform the user about a warning. It is not
+        an abstract method, so mediators that only implement the abstract methods
+        do not have to provide an implementation.
+
+        Args:
+          warning (str): warning text.
+        """
+
     @abc.abstractmethod
     def GetVSSStoreIdentifiers(self, volume_system, volume_identifiers):
         """Retrieves VSS store identifiers.
@@ -183,6 +199,20 @@ class VolumeScanner:
         self._source_scanner = source_scanner.SourceScanner(sector_size=sector_size)
         self._source_type = None
 
+    def _CheckVolumeScannerOptions(self, options):
+        """Checks the volume scanner options.
+
+        Args:
+          options (VolumeScannerOptions): volume scanner options.
+
+        Raises:
+          ScannerError: if the scan mode is not supported.
+        """
+        if options.scan_mode not in options.SCAN_MODES:
+            raise errors.ScannerError(
+                f"Unsupported scan mode: {options.scan_mode!s}."
+            )
+
     def _GetBasePathSpecs(self, scan_context, options):
         """Determines the base path specifications.
 
@@ -194,8 +224,11 @@ class VolumeScanner:
           list[PathSpec]: path specifications.
 
         Raises:
-          ScannerError: if the format of or within the source is not supported.
+          ScannerError: if the format of or within the source is not supported or
+              the volume scanner options are not supported.
         """
+        self._CheckVolumeScannerOptions(options)
+
         scan_node = scan_context.GetRootScanNode()
 
         if scan_context.source_type not in (
@@ -204,8 +237,11 @@ class VolumeScanner:
         ):
             return [scan_node.path_spec]
 
-        # Get the first node where where we need to decide what to process.
-        while len(scan_node.sub_nodes) == 1:
+        # Get the first node where where we need to decide what to process. Do not
+        # descend beyond the root of a volume system, since the volume scanner
+        # options, such as the selected volumes, are applied when processing the
+        # volume system root.
+        while len(scan_node.sub_nodes) == 1 and not scan_node.IsVolumeSystemRoot():
             scan_node = scan_node.sub_nodes[0]
 
         base_path_specs = []
@@ -263,18 +299,15 @@ class VolumeScanner:
             else:
                 partitions = options.partitions
 
-            try:
-                selected_volumes = self._NormalizedVolumeIdentifiers(
-                    volume_system,
-                    partitions,
-                    prefix=volume_system.VOLUME_IDENTIFIER_PREFIX,
-                )
-                if not set(selected_volumes).difference(volume_identifiers):
-                    return selected_volumes
-
-            except errors.ScannerError as exception:
-                if self._mediator:
-                    self._mediator.PrintWarning(f"{exception!s}")
+            selected_volumes = self._NormalizedVolumeIdentifiers(
+                volume_system,
+                partitions,
+                prefix=volume_system.VOLUME_IDENTIFIER_PREFIX,
+            )
+            self._CheckSelectedVolumeIdentifiers(
+                selected_volumes, volume_identifiers, "partition"
+            )
+            return selected_volumes
 
         if len(volume_identifiers) > 1:
             if not self._mediator:
@@ -320,18 +353,15 @@ class VolumeScanner:
             else:
                 volumes = options.volumes
 
-            try:
-                selected_volumes = self._NormalizedVolumeIdentifiers(
-                    volume_system,
-                    volumes,
-                    prefix=volume_system.VOLUME_IDENTIFIER_PREFIX,
-                )
-                if not set(selected_volumes).difference(volume_identifiers):
-                    return selected_volumes
-
-            except errors.ScannerError as exception:
-                if self._mediator:
-                    self._mediator.PrintWarning(f"{exception!s}")
+            selected_volumes = self._NormalizedVolumeIdentifiers(
+                volume_system,
+                volumes,
+                prefix=volume_system.VOLUME_IDENTIFIER_PREFIX,
+            )
+            self._CheckSelectedVolumeIdentifiers(
+                selected_volumes, volume_identifiers, "volume"
+            )
+            return selected_volumes
 
         if len(volume_identifiers) > 1:
             if not self._mediator:
@@ -380,18 +410,15 @@ class VolumeScanner:
             else:
                 snapshots = options.snapshots
 
-            try:
-                selected_volumes = self._NormalizedVolumeIdentifiers(
-                    volume_system,
-                    snapshots,
-                    prefix=volume_system.VOLUME_IDENTIFIER_PREFIX,
-                )
-                if not set(selected_volumes).difference(volume_identifiers):
-                    return selected_volumes
-
-            except errors.ScannerError as exception:
-                if self._mediator:
-                    self._mediator.PrintWarning(f"{exception!s}")
+            selected_volumes = self._NormalizedVolumeIdentifiers(
+                volume_system,
+                snapshots,
+                prefix=volume_system.VOLUME_IDENTIFIER_PREFIX,
+            )
+            self._CheckSelectedVolumeIdentifiers(
+                selected_volumes, volume_identifiers, "snapshot"
+            )
+            return selected_volumes
 
         if not self._mediator:
             raise errors.ScannerError(
@@ -412,6 +439,28 @@ class VolumeScanner:
             volume_identifiers,
             prefix=volume_system.VOLUME_IDENTIFIER_PREFIX,
         )
+
+    def _CheckSelectedVolumeIdentifiers(
+        self, selected_volume_identifiers, volume_identifiers, volume_type
+    ):
+        """Checks if the selected volume identifiers are available.
+
+        Args:
+          selected_volume_identifiers (list[str]): selected volume identifiers.
+          volume_identifiers (list[str]): available volume identifiers.
+          volume_type (str): human readable volume type, such as "partition".
+
+        Raises:
+          ScannerError: if a selected volume identifier is not available.
+        """
+        unsupported_volume_identifiers = sorted(
+            set(selected_volume_identifiers).difference(volume_identifiers)
+        )
+        if unsupported_volume_identifiers:
+            identifiers_string = ", ".join(unsupported_volume_identifiers)
+            raise errors.ScannerError(
+                f"Unsupported {volume_type:s} identifier(s): {identifiers_string:s}."
+            )
 
     def _NormalizedVolumeIdentifiers(
         self, volume_system, volume_identifiers, prefix="v"
@@ -619,13 +668,9 @@ class VolumeScanner:
                 return
 
         if scan_node.IsVolumeSystemRoot():
-            if options.scan_mode in (
-                options.SCAN_MODE_ALL,
-                options.SCAN_MODE_SNAPSHOTS_ONLY,
-            ):
-                self._ScanVolumeSystemRoot(
-                    scan_context, scan_node, options, base_path_specs
-                )
+            self._ScanVolumeSystemRoot(
+                scan_context, scan_node, options, base_path_specs
+            )
 
         elif scan_node.IsFileSystem():
             self._ScanFileSystem(scan_node, base_path_specs)
@@ -649,7 +694,31 @@ class VolumeScanner:
             base_path_specs.append(path_spec)
 
         else:
-            for sub_scan_node in scan_node.sub_nodes:
+            sub_scan_nodes = scan_node.sub_nodes
+            if options.scan_mode == options.SCAN_MODE_SNAPSHOTS_ONLY:
+                # For a volume system with snapshots, such as VSS, the source
+                # scanner stores the current volume as a sibling of the volume
+                # system root. In "snapshots-only" mode only the snapshots need to
+                # be scanned, not the current volume.
+                snapshot_parent_path_specs = [
+                    sub_scan_node.path_spec.parent
+                    for sub_scan_node in sub_scan_nodes
+                    if sub_scan_node.IsVolumeSystemRoot()
+                    and sub_scan_node.type_indicator
+                    == definitions.TYPE_INDICATOR_VSHADOW
+                ]
+                if snapshot_parent_path_specs:
+                    sub_scan_nodes = [
+                        sub_scan_node
+                        for sub_scan_node in sub_scan_nodes
+                        if not (
+                            sub_scan_node.IsFileSystem()
+                            and sub_scan_node.path_spec.parent
+                            in snapshot_parent_path_specs
+                        )
+                    ]
+
+            for sub_scan_node in sub_scan_nodes:
                 self._ScanVolume(scan_context, sub_scan_node, options, base_path_specs)
 
     def _ScanVolumeSystemRoot(self, scan_context, scan_node, options, base_path_specs):
@@ -687,20 +756,26 @@ class VolumeScanner:
             volume_identifiers = self._GetPartitionIdentifiers(scan_node, options)
 
         elif scan_node.type_indicator == definitions.TYPE_INDICATOR_VSHADOW:
-            volume_system = volume_system_factory.Factory.NewVolumeSystem(
-                scan_node.type_indicator
-            )
-            try:
-                volume_system.Open(scan_node.path_spec)
+            # A VSS volume system only contains snapshots (stores), not the current
+            # volume. Therefore in "volumes-only" mode no VSS store is scanned.
+            volume_identifiers = []
 
-                volume_identifiers = self._GetVolumeSnapshotIdentifiers(
-                    volume_system, options
+            if options.scan_mode != options.SCAN_MODE_VOLUMES_ONLY:
+                volume_system = volume_system_factory.Factory.NewVolumeSystem(
+                    scan_node.type_indicator
                 )
-                # Process VSS stores (snapshots) starting with the most recent one.
-                volume_identifiers.reverse()
+                try:
+                    volume_system.Open(scan_node.path_spec)
 
-            except errors.BackEndError:
-                volume_identifiers = []
+                    volume_identifiers = self._GetVolumeSnapshotIdentifiers(
+                        volume_system, options
+                    )
+                    # Process VSS stores (snapshots) starting with the most recent
+                    # one.
+                    volume_identifiers.reverse()
+
+                except errors.BackEndError:
+                    volume_identifiers = []
 
         else:
             raise errors.ScannerError(
